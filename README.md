@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Shelly i4 → 2PM Cover Controller (Gen3)
 
 ### ⚠️ Hardware Requirement: Integrated End Switches
@@ -102,3 +103,7 @@ http://<2PM-IP>/rpc/KVS.Set?key=<param>&value=<new_value>
 ## 📜 License
 
 This project is released under the MIT License (see LICENSE.txt).
+=======
+# Shelly-Cover-Controller
+Controlling a cover/blind on a Shelly 2PM Gen 3 with two Shelly I4 Gen 3 inputs
+>>>>>>> 22b6419f57f074bb74a0fb7b80b7a27766fe6e88
