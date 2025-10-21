@@ -100,6 +100,11 @@ All values can be modified via:
 http://<2PM-IP>/rpc/KVS.Set?key=<param>&value=<new_value>
 ```
 
+
+[![Donate via PayPal](https://img.shields.io/badge/Donate-PayPal-blue)](https://paypal.me/Franklins59)
+
+
+
 ## 📜 License
 
 This project is released under the MIT License (see LICENSE.txt).
@@ -107,3 +112,4 @@ This project is released under the MIT License (see LICENSE.txt).
 # Shelly-Cover-Controller
 Controlling a cover/blind on a Shelly 2PM Gen 3 with two Shelly I4 Gen 3 inputs
 >>>>>>> 22b6419f57f074bb74a0fb7b80b7a27766fe6e88
+
