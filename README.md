@@ -1,115 +1,279 @@
-<<<<<<< HEAD
-# Shelly i4 → 2PM Cover Controller (Gen3)
+# Shelly Cover Controller (Gen3)
 
-### ⚠️ Hardware Requirement: Integrated End Switches
+**Control a Shelly Plus 2PM (Gen3) roller shutter / blind with a Shelly i4 (Gen3)**  
+using Shelly Script (JS, Gen3). Supports *short*, *double* and *long* presses on the i4,
+custom presets, slat-nudging, and safe cover movement.
 
-This script must only be used with **roller shutters equipped with built-in mechanical end stops** (hardware limit switches).  
-The Shelly 2PM relies on these end positions to perform calibration and position tracking.  
-Using motors without integrated limit switches (or with external relay control only) will lead to incorrect position reporting and unreliable operation.
+---
 
-
-
-This project implements a **smart two-part control system** for Shelly devices to manage blinds or shutters with precise position and slat (lamella) adjustment.  
-It is designed for **Shelly Gen3 devices running firmware 1.7.x or newer**.
+German version below
 
 ## 🧩 Overview
 
-| Device | Script | Function |
-|:--------|:--------|:----------|
-| **Shelly i4 Gen3** | `ScriptI4.js` | Button interface — translates button presses (`single`, `long`, `double`) into high-level commands and sends them to the 2PM. |
-| **Shelly 2PM Gen3** | `Script2PM.js` | Core controller — handles calibrated blind movement, nudging, preset heights, and slat positioning. |
+This project connects a **Shelly i4 Gen3** (input controller) with one or more **Shelly Plus 2PM Gen3**
+(actuator) using Shelly Script and local KVS (Key-Value Store) messaging.
 
-Communication between the two devices uses the **KVS RPC interface** (`/rpc/KVS.Set`).
+- **i4 Script:** Detects button events (short / double / long press) and sends commands to the target 2PM.  
+- **2PM Script:** Interprets these commands, executes cover movements, presets, and slat-nudging.  
+- **Communication:** 100% local via **KVS**, no polling, no cloud.  
+- **Multi-target control:** One i4 can operate multiple 2PMs simultaneously.
 
-## ⚙️ Hardware Setup
+> ⚠️ Works only with **calibrated covers with mechanical endstops**.  
+> Non-calibrated covers may not move accurately.
 
-| Function | Device | Input / Output |
-|-----------|---------|----------------|
-| Up Button | i4 | `Input0` |
-| Down Button | i4 | `Input1` |
-| Cover Motor | 2PM | `Relay0 / Relay1` |
-| Communication | LAN or WLAN | Direct HTTP RPC between i4 and 2PM |
+---
 
-## 🎮 Button Mapping (on i4)
+## 🧰 Components
 
-| Action | Input | Result |
-|:--------|:-------|:--------|
-| **Short press** | Up / Down | Move up / down if idle, stop if moving |
-| **Long press** | Up | Nudge up (`nudge_up_ms`) |
-| **Long press** | Down | Nudge down (`nudge_down_ms`) |
-| **Double press** | Up | Move to preset height `preset_1`, then slat adjust to `slat_pos_1` |
-| **Double press** | Down | Move to preset height `preset_2`, then slat adjust to `slat_pos_2` |
+| Device | Type / Gen | Script | Purpose |
+|---------|-------------|---------|----------|
+| Shelly i4 Gen3 | Input controller | `scripts/ScriptI4.js` | Sends commands |
+| Shelly Plus 2PM Gen3 | Actuator | `scripts/Script2PM.js` | Executes commands |
 
-## 🧠 Features
+---
 
-- Fully event-driven via i4 inputs  
-- No internal polling delay on button recognition  
-- Calibrated mode only (script inactive on uncalibrated covers)  
-- Fine-grained nudge times for slat angle control  
-- Asymmetric up/down full-travel times  
-- Persistent configuration via KVS on the 2PM  
-- Zero flash wear during runtime — KVS written only on startup
+## 🚀 Installation
 
-## 🔗 Communication Setup (Target IP)
+### 1️⃣ On Shelly i4 Gen3
+1. Web-UI → **Scripts → + → Paste ScriptI4.js**
+2. Set the IP/hostname of your 2PM: `target_2pm_ip`
+3. Enable “Run on boot”
 
-The **i4 script** sends all button actions to the **2PM** using an HTTP RPC call:  
-```
-http://<2PM-IP>/rpc/KVS.Set?key=coverex_cmd&value=<command>
-```
+### 2️⃣ On Shelly Plus 2PM Gen3
+1. Web-UI → **Scripts → + → Paste Script2PM.js**
+2. Enable “Run on boot”
+3. (Optional) Adjust presets and nudging times using KVS
 
-To make this work, the i4 needs to know the IP address of the target 2PM.
+Example RPC calls:
+```bash
+# Set 2PM target IP on i4
+http://<I4-IP>/rpc/KVS.Set?key=target_2pm_ip&value="192.168.1.63"
 
-### Automatic setup
-- On first run, the i4 checks for the KVS key `target_2pm_ip`.
-- If it’s missing, the script creates it with the default IP (e.g. `"192.168.1.64"`).  
-- You can read or change it via:
-  ```
-  http://<I4-IP>/rpc/KVS.Get?key=target_2pm_ip
-  http://<I4-IP>/rpc/KVS.Set?key=target_2pm_ip&value="<NEW_IP>"
-  ```
-- The i4 transmits every button action (e.g. `single_up`, `double_down`, `long_up`, …) to the 2PM’s KVS.
+# Preset 1 on 2PM (e.g. 40% open)
+http://192.168.1.63/rpc/KVS.Set?key=preset_1&value=40
 
-### Example
-If your 2PM has the IP `192.168.1.63`, update the i4 like this:
-```
-http://192.168.1.65/rpc/KVS.Set?key=target_2pm_ip&value="192.168.1.63"
+# Nudging (in milliseconds)
+http://192.168.1.63/rpc/KVS.Set?key=nudge_up_ms&value=800
+http://192.168.1.63/rpc/KVS.Set?key=nudge_down_ms&value=600
 ```
 
-Console log output:
-```
-i4 target_2pm_ip = 192.168.1.63
-```
+### 3️⃣ Testing
+- **Short press →** Move up/down  
+- **Double press →** Move to preset position  
+- **Long press →** Slat nudge (fine adjustment)
 
-## 🪄 Default Parameters (on 2PM)
+---
+
+## 🧠 Function Flow
 
 ```
-nudge_up_ms: 800
-nudge_down_ms: 600
-preset_1: 40
-preset_2: 60
-slat_pos_1: 50
-slat_pos_2: 25
-slat_full_up_ms: 1000
-slat_full_down_ms: 1000
-poll_interval_ms: 50
-run_timeout_ms: 90000
+[i4 Input] → [ScriptI4.js]
+   ⇓ (HTTP RPC / KVS)
+[2PM KVS Entry] → [Script2PM.js]
+   ⇓
+[Cover.Move / Stop / Preset / Nudge]
 ```
 
-All values can be modified via:
+- KVS entries handle all communication (`coverex_cmd`, `preset_*`, …)
+- No polling, no cloud dependency
+- Clean separation of logic: one script per device
+
+---
+
+## ⚙️ Configurable KVS Parameters on 2PM
+
+| Key | Unit | Description | Default |
+|-----|------|-------------|----------|
+| `nudge_down_ms` | ms | Short down nudge time | 600 |
+| `nudge_up_ms` | ms | Short up nudge time | 800 |
+| `poll_interval_ms` | ms | polling interval | 50 |
+| `preset_1` | % | Preset position 1 | 60 |
+| `preset_2` | % | Preset position 2 | 40 |
+| `slat_full_down_ms` | ms | Full down slat tilt | 1700 |
+| `slat_full_up_ms` | ms | Full up slat tilt | 2000 |
+| `slat_pos_1` | % | Preset slat position 1 | 50 |
+| `slat_pos_2` | % | Preset slat position 2 | 50 |
+
+## ⚙️ Configurable KVS Parameters on I4
+
+| Key | Unit | Description | Default |
+|-----|------|-------------|----------|
+| `target_2pm_ips` | IP | Target IPs called from I4, change for your own (1 or more) | 192.168.1.xx,192.168.1.yy |
+
+All values can be set via `/rpc/KVS.Set` and viewed using `/rpc/KVS.GetAll`.
+
+---
+
+## 🧪 Tested with
+
+| Device | Firmware |
+|---------|-----------|
+| Shelly i4 Gen3 | 1.7.1 |
+| Shelly Plus 2PM Gen3 | 1.7.1 |
+
+---
+
+## 🧰 Troubleshooting
+
+- Ensure the 2PM is calibrated (`/rpc/Cover.GetStatus` → `calibrated:true`)
+- Enable i4 script logs for debugging
+- Verify LAN connectivity (same subnet, no VLAN isolation)
+- To reset configuration: `/rpc/KVS.DeleteAll`
+
+---
+
+## 💬 Contribute / Share
+
+Contributions and translations are welcome!  
+If you post about this project, please include a link back to this repository.
+
+- German Forum: [Shelly-Forum.com](https://shelly-forum.com)  
+- Official Shelly Community: [community.shelly.cloud](https://community.shelly.cloud)  
+- Home Assistant Forum: “Share your Projects” → *Shelly i4 → 2PM Cover Controller*
+
+---
+
+## ⚙️ License & Disclaimer
+
+This project is released under the **MIT License**  
+© 2025 Franz Forster
+
+⚠️ Use at your own risk — no warranty or liability is provided.
+You are free to use and modify it under the terms of the MIT License.  
+
+---
+
+## 🇩🇪 Kurzbeschreibung
+
+Ziel dieses Projekts:  
+Mit einem **Shelly i4 Gen3** zwei Tasten (SW1 / SW2) nutzen, um einen oder mehrere **Shelly Plus 2PM Gen3**
+zu steuern – z. B. Jalousie oder Rollladen mit kalibrierter Laufzeit.
+
+- **i4 Script:** erkennt Short / Double / Long Press und sendet Kommandos an den / die 2PM.  
+- **2PM Script:** interpretiert diese Kommandos, verwaltet Presets, Nudging-Zeiten usw.  
+- **Kommunikation:** rein lokal über **KVS (Key-Value Store)**, keine Polls oder Cloud.  
+- **Multi-Target-Control:** Ein i4 kann mehrere 2PM-Geräte parallel ansprechen.  
+
+> ⚠️ Nur für **kalibrierte Covers mit Endschaltern** geeignet!  
+> Sonst kann die Positionierung nicht korrekt funktionieren.
+
+---
+
+## 🧩 Komponenten
+
+| Gerät | Typ / Gen | Script | Zweck |
+|-------|------------|--------|-------|
+| Shelly i4 Gen3 | Input-Controller | `scripts/ScriptI4.js` | sendet Kommandos |
+| Shelly Plus 2PM Gen3 | Aktor | `scripts/Script2PM.js` | führt Kommandos aus |
+
+---
+
+## 🚀 Installation
+
+### 1️⃣ i4 Gen3
+1. Web-UI → **Scripts → + → Paste ScriptI4.js**
+2. Anpassen: `target_2pm_ip` (IP oder Hostname des 2PM)
+3. Script aktivieren („Enable on boot“)
+
+### 2️⃣ 2PM Gen3
+1. Web-UI → **Scripts → + → Paste Script2PM.js**
+2. Script aktivieren
+3. Optional: Presets & Nudging über **KVS API** oder Webinterface anpassen
+
+Beispiel-Befehle:
+```bash
+# i4 → Ziel-IP setzen
+http://<I4-IP>/rpc/KVS.Set?key=target_2pm_ip&value="192.168.1.63"
+
+# Preset 1 am 2PM (z. B. 40 %)
+http://192.168.1.63/rpc/KVS.Set?key=preset_1&value=40
+
+# Slat-Nudge (Millisekunden)
+http://192.168.1.63/rpc/KVS.Set?key=nudge_up_ms&value=800
+http://192.168.1.63/rpc/KVS.Set?key=nudge_down_ms&value=600
 ```
-http://<2PM-IP>/rpc/KVS.Set?key=<param>&value=<new_value>
+
+### 3️⃣ Test
+- **Kurzdruck →** Fahre auf / ab  
+- **Doppelklick →** Preset-Position  
+- **Langdruck →** Nudge (Lamellenstellung)
+
+---
+
+## 🧠 Funktionsprinzip
+
+```
+[i4 Button] → [ScriptI4.js]
+   ⇓  (HTTP RPC → KVS)
+[2PM KVS Entry] → [Script2PM.js]
+   ⇓
+[Cover.Move / Stop / Preset / Nudge]
 ```
 
+- Kommunikation über KVS-Einträge (`coverex_cmd`, `preset_*`, …)
+- Keine zyklische Abfrage, keine Cloud
+- Getrennte Logik → leicht anpassbar für mehrere Targets
 
-[![Donate via PayPal](https://img.shields.io/badge/Donate-PayPal-blue)](https://paypal.me/Franklins59)
+---
 
+## ⚙️ Konfigurierbare Parameter im 2PM
 
+| Name | Einheit | Beschreibung | Default |
+|-----|------|-------------|----------|
+| `nudge_down_ms` | ms | Short down nudge time | 600 |
+| `nudge_up_ms` | ms | Short up nudge time | 800 |
+| `poll_interval_ms` | ms | polling interval | 50 |
+| `preset_1` | % | Preset position 1 | 60 |
+| `preset_2` | % | Preset position 2 | 40 |
+| `slat_full_down_ms` | ms | Full down slat tilt | 1700 |
+| `slat_full_up_ms` | ms | Full up slat tilt | 2000 |
+| `slat_pos_1` | % | Preset slat position 1 | 50 |
+| `slat_pos_2` | % | Preset slat position 2 | 50 |
 
-## 📜 License
+## ⚙️ Konfigurierbare Parameters im I4
 
-This project is released under the MIT License (see LICENSE.txt).
-=======
-# Shelly-Cover-Controller
-Controlling a cover/blind on a Shelly 2PM Gen 3 with two Shelly I4 Gen 3 inputs
->>>>>>> 22b6419f57f074bb74a0fb7b80b7a27766fe6e88
+| Key | Unit | Description | Default |
+|-----|------|-------------|----------|
+| `target_2pm_ips` | IP | Ziel IPs aufgerufen vom I4, anpassen (1 oder mehrere) | 192.168.1.xx,192.168.1.yy |
+
+Alle Werte können per `/rpc/KVS.Set` gesetzt und mit `/rpc/KVS.GetAll` ausgelesen werden.
+
+---
+
+## 🧪 Getestet mit
+
+| Gerät | Firmware |
+|--------|-----------|
+| i4 Gen3 | 1.7.1 |
+| Plus 2PM Gen3 | 1.7.1 |
+
+---
+
+## 🧰 Troubleshooting
+
+- Prüfen, ob 2PM kalibriert ist (`/rpc/Cover.GetStatus` → `calibrated:true`)
+- i4-Script-Logs im Browser aktivieren
+- Netz-Zugriff prüfen (same LAN, kein VLAN-Block)
+- Bei Bedarf KVS-Einträge löschen (`/rpc/KVS.DeleteAll`)
+
+---
+
+## 📣 Beitragen / Teilen
+
+Sie können die Skripte gerne verbessern oder übersetzen.  
+Wenn Sie darüber schreiben, verlinken Sie auf dieses Repository.
+
+- Forum (DE): [Shelly-Forum.com](https://shelly-forum.com)
+- Official Community: [community.shelly.cloud](https://community.shelly.cloud)
+- Home Assistant: “Share your Projects” → Shelly i4 → 2PM Cover Controller
+
+---
+
+## ⚙️ Lizenz & Haftungsausschluss
+
+Dieses Projekt wird unter der **MIT-Lizenz** veröffentlicht.  
+© 2025 Franz Forster
+
+⚠️ Die Verwendung erfolgt auf eigene Gefahr - es wird keine Garantie oder Haftung übernommen.
+Es steht Ihnen frei, es unter den Bedingungen der MIT-Lizenz zu verwenden und zu verändern.  
 
