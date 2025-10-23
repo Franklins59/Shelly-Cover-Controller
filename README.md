@@ -5,6 +5,7 @@ using Shelly Script (JS, Gen3). Supports *short*, *double* and *long* presses on
 custom presets, slat-nudging, and safe cover movement.
 
 ---
+[![Donate via PayPal](https://img.shields.io/badge/Donate-PayPal-blue)](https://paypal.me/Franklins59)
 
 German version below
 
