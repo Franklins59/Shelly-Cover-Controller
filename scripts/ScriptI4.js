@@ -2,28 +2,41 @@
  * Shelly i4 Gen3 1.7.x – lightweight sender → 2PM /rpc/KVS.Set
  * Author: Franz Forster
  * License: MIT
+ *  
+ * v1.2 — October 24, 2025   Added Two-Group Mode for i4  
  *
- * Sends ONLY: single_up/down, double_up/down, long_up/down
+ *
+ * Sends ONLY: single_up/down, double_up/down, long_up/down.
  * (NO stop command from the i4 – stop logic is handled on the 2PM)
  *
- * Multi-target support:
- *   - KVS "target_2pm_ips": comma-separated IPs (preferred), e.g. 192.168.1.63,192.168.1.64
- *     Also accepts a JSON array when stored cleanly: ["192.168.1.63","192.168.1.64"]
- *   - Optional: KVS "send_delay_ms" (default 80), KVS "debug" (boolean).
+ * Two-Group Mode:
+ *   - Group A: IN0 = up, IN1 = down  → KVS "groupA_targets"
+ *   - Group B: IN2 = up, IN3 = down  → KVS "groupB_targets"
+ *   - A group is ACTIVE iff its target list contains ≥ 1 valid IPv4.
  *
- * New:
- *   - Startup validation prints (in DEBUG mode) both valid and ignored (invalid) entries.
+ * KVS keys (all on i4):
+ *   - groupA_targets : comma-separated IPs (preferred), e.g. 192.168.1.63,192.168.1.64
+ *                      (also accepts JSON array ["192.168.1.63","192.168.1.64"] when clean)
+ *   - groupB_targets : same format; if empty/invalid → Group B disabled
+ *   - send_delay_ms  : global inter-target gap (default 80, range 0..2000)
+ *   - debug          : boolean (true/false) for verbose logging (default false)
+ *
+ * On first start if "groupA_targets" is missing, it will be created with:
+ *   192.168.1.xx,192.168.1.yy   (raw string, no quotes)
  ************************************************************/
 
-let DEFAULT_TARGET_IPS = "192.168.1.xx,192.168.1.yy";   // set your defaults here 
-let KVS_KEY_CMD    = "coverex_cmd";
-let KVS_KEY_IPS    = "target_2pm_ips";
-let KVS_KEY_DELAY  = "send_delay_ms";
-let KVS_KEY_DEBUG  = "debug";
+let DEFAULT_GROUPA = "192.168.1.xx,192.168.1.yy"; // set your site defaults here (raw, no quotes)
+let KVS_KEY_CMD   = "coverex_cmd";
+let KVS_A_TARGETS = "groupA_targets";
+let KVS_B_TARGETS = "groupB_targets";
+let KVS_DELAY     = "send_delay_ms";
+let KVS_DEBUG     = "debug";
 
-let SEND_DELAY_MS = 80;    // inter-target gap
-let TARGET_IPS = [];       // resolved list of target IPs
-let DEBUG = true;
+let SEND_DELAY_MS = 80;   // global delay
+let DEBUG = false;
+
+let A_IPS = [];           // Group A resolved targets
+let B_IPS = [];           // Group B resolved targets
 
 /* ---------- Small utilities (no RegEx, Espruino-friendly) ---------- */
 function isStr(x){ return typeof x === "string"; }
@@ -70,12 +83,12 @@ function validIPv4(s) {
   return true;
 }
 
-/* Parse KVS value into arrays of IPv4s: returns { valid:[], invalid:[] }.
+/* Parse KVS value into { valid:[], invalid:[] }.
    Prefers comma-separated raw string; supports JSON array when clean. */
 function parseTargetsDetailed(v){
   let raw = [];
-  let result = { valid: [], invalid: [] };
-  if (v === undefined || v === null) return result;
+  let out = { valid: [], invalid: [] };
+  if (v === undefined || v === null) return out;
 
   if (isStr(v)) {
     let s = trim(v);
@@ -90,7 +103,7 @@ function parseTargetsDetailed(v){
         raw = s.split(",");
       }
     } else {
-      // comma-separated string (preferred)
+      // comma-separated preferred
       raw = s.split(",");
     }
   } else if (isArr(v)) {
@@ -99,25 +112,23 @@ function parseTargetsDetailed(v){
     raw = String(v).split(",");
   }
 
-  // Normalize, dequote, validate
   for (let i=0;i<raw.length;i++){
     let s = dequote(trim(String(raw[i])));
     if (!s) continue;
-    if (validIPv4(s)) result.valid.push(s);
-    else result.invalid.push(s);
+    if (validIPv4(s)) out.valid.push(s);
+    else out.invalid.push(s);
   }
-  return result;
+  return out;
 }
 
 /* ---------- KVS loaders ---------- */
 function loadDebug(){
-  Shelly.call("KVS.Get", { key: KVS_KEY_DEBUG }, function(res, err){
+  Shelly.call("KVS.Get", { key: KVS_DEBUG }, function(res, err){
     if (!err && res && res.value !== undefined && res.value !== null) {
       let v = res.value;
-      if (v === true || v === "true" || v === 1 || v === "1") DEBUG = true;
-      else DEBUG = false;
+      DEBUG = (v === true || v === "true" || v === 1 || v === "1");
     } else {
-      Shelly.call("KVS.Set", { key: KVS_KEY_DEBUG, value: false });
+      Shelly.call("KVS.Set", { key: KVS_DEBUG, value: false });
       DEBUG = false;
     }
     if (DEBUG) print("i4 DEBUG =", DEBUG);
@@ -125,50 +136,61 @@ function loadDebug(){
 }
 
 function loadDelay(){
-  Shelly.call("KVS.Get", { key: KVS_KEY_DELAY }, function(res, err){
+  Shelly.call("KVS.Get", { key: KVS_DELAY }, function(res, err){
     if (!err && res && res.value !== undefined && res.value !== null) {
       let n = toInt(res.value);
       if (n >= 0 && n <= 2000) SEND_DELAY_MS = n;
     } else {
-      Shelly.call("KVS.Set", { key: KVS_KEY_DELAY, value: SEND_DELAY_MS });
+      Shelly.call("KVS.Set", { key: KVS_DELAY, value: SEND_DELAY_MS });
     }
     print("i4 send_delay_ms =", SEND_DELAY_MS);
   });
 }
 
-function logTargets(valid, invalid){
-  print("i4 targets (valid):", JSON.stringify(valid));
+function logTargets(label, valid, invalid){
+  print(label, "(valid):", JSON.stringify(valid));
   if (DEBUG && invalid && invalid.length){
-    print("i4 targets (invalid, ignored):", JSON.stringify(invalid));
+    print(label, "(invalid, ignored):", JSON.stringify(invalid));
   }
 }
 
-function loadTargets(){
-  Shelly.call("KVS.Get", { key: KVS_KEY_IPS }, function(res_ips, err_ips){
+function loadGroupA(){
+  Shelly.call("KVS.Get", { key: KVS_A_TARGETS }, function(res, err){
     let parsed = { valid: [], invalid: [] };
-
-    if (!err_ips && res_ips && res_ips.value !== undefined && res_ips.value !== null){
-      parsed = parseTargetsDetailed(res_ips.value);
-      // If KVS existed but all entries invalid → keep empty list, just log
+    if (!err && res && res.value !== undefined && res.value !== null){
+      parsed = parseTargetsDetailed(res.value);
       if (parsed.valid.length === 0 && parsed.invalid.length === 0){
-        // value may be empty string; in that case prefill with defaults
-        Shelly.call("KVS.Set", { key: KVS_KEY_IPS, value: DEFAULT_TARGET_IPS });
-        parsed = parseTargetsDetailed(DEFAULT_TARGET_IPS);
+        // value exists but empty → prefill defaults
+        Shelly.call("KVS.Set", { key: KVS_A_TARGETS, value: DEFAULT_GROUPA });
+        parsed = parseTargetsDetailed(DEFAULT_GROUPA);
       }
     } else {
-      // missing → create with default IPs (raw string)
-      Shelly.call("KVS.Set", { key: KVS_KEY_IPS, value: DEFAULT_TARGET_IPS });
-      parsed = parseTargetsDetailed(DEFAULT_TARGET_IPS);
+      // missing → create with defaults
+      Shelly.call("KVS.Set", { key: KVS_A_TARGETS, value: DEFAULT_GROUPA });
+      parsed = parseTargetsDetailed(DEFAULT_GROUPA);
     }
+    A_IPS = parsed.valid;
+    logTargets("A targets", parsed.valid, parsed.invalid);
+  });
+}
 
-    TARGET_IPS = parsed.valid;
-    logTargets(parsed.valid, parsed.invalid);
-    loadDelay();
+function loadGroupB(){
+  Shelly.call("KVS.Get", { key: KVS_B_TARGETS }, function(res, err){
+    let parsed = { valid: [], invalid: [] };
+    if (!err && res && res.value !== undefined && res.value !== null){
+      parsed = parseTargetsDetailed(res.value);
+    } // else: missing → B stays disabled
+    B_IPS = parsed.valid;
+    logTargets("B targets", parsed.valid, parsed.invalid);
+    if (DEBUG && B_IPS.length === 0) print("B disabled (no targets)");
   });
 }
 
 /* ---------- Mapping ---------- */
-function dirForInputId(id){ return id===0 ? "up" : (id===1 ? "down" : null); }
+function dirForInputId(id){
+  return id===0 || id===2 ? "up"   :
+         id===1 || id===3 ? "down" : null;
+}
 function mapToken(id, ev){
   let dir = dirForInputId(id);
   if (!dir) return null;
@@ -178,20 +200,19 @@ function mapToken(id, ev){
   return null; // ignore btn_down / btn_up
 }
 
-/* ---------- Sender ---------- */
-function kvsSetMulti(token){
+/* ---------- Sender (sequential with 1 retry) ---------- */
+function kvsSetToList(token, ipList, label){
   if (!token) return;
-  let ips = TARGET_IPS.slice(0);
+  let ips = ipList.slice(0);
   if (ips.length === 0) {
-    if (DEBUG) print("No targets configured; skip", token);
+    if (DEBUG) print(label, "skip (no targets):", token);
     return;
   }
-
   let ok = 0, fail = 0;
 
   function sendTo(idx){
     if (idx >= ips.length){
-      print("KVS.Set summary:", token, "ok:", ok, "fail:", fail, "targets:", ips.length);
+      print(label, "summary:", token, "ok:", ok, "fail:", fail, "targets:", ips.length);
       return;
     }
     let ip = ips[idx];
@@ -199,49 +220,58 @@ function kvsSetMulti(token){
 
     Shelly.call("HTTP.GET", { url: url, timeout: 4 }, function(res){
       if (res && res.code === 200){
-        if (DEBUG) print("OK →", ip, token);
+        if (DEBUG) print(label, "OK →", ip, token);
         ok++;
-        if (SEND_DELAY_MS > 0){
-          Timer.set(SEND_DELAY_MS, false, function(){ sendTo(idx+1); });
-        } else sendTo(idx+1);
+        if (SEND_DELAY_MS > 0) Timer.set(SEND_DELAY_MS, false, function(){ sendTo(idx+1); });
+        else sendTo(idx+1);
       } else {
-        if (DEBUG) print("ERR →", ip, token, "code:", res ? res.code : "nores", "retry");
+        if (DEBUG) print(label, "ERR →", ip, token, "code:", res ? res.code : "nores", "retry");
         Timer.set(120, false, function(){
           Shelly.call("HTTP.GET", { url: url, timeout: 4 }, function(res2){
-            if (res2 && res2.code === 200) { if (DEBUG) print("OK(retry) →", ip); ok++; }
-            else { if (DEBUG) print("FAIL →", ip); fail++; }
-            if (SEND_DELAY_MS > 0){
-              Timer.set(SEND_DELAY_MS, false, function(){ sendTo(idx+1); });
-            } else sendTo(idx+1);
+            if (res2 && res2.code === 200) { if (DEBUG) print(label, "OK(retry) →", ip); ok++; }
+            else { if (DEBUG) print(label, "FAIL →", ip); fail++; }
+            if (SEND_DELAY_MS > 0) Timer.set(SEND_DELAY_MS, false, function(){ sendTo(idx+1); });
+            else sendTo(idx+1);
           });
         });
       }
     });
   }
-
   sendTo(0);
 }
 
 /* ---------- Startup ---------- */
 loadDebug();
-loadTargets();
+loadGroupA();
+loadGroupB();
+loadDelay();
 
 /* ---------- Event handling ---------- */
+/* Gen3 event format (single parameter containing obj.info) */
 Shelly.addEventHandler(function (obj) {
   if (!obj || !obj.info || typeof obj.info !== "object") return;
-  let inf = obj.info;
+  let inf = obj.info;  // {component:"input:x", id, event}
   if (typeof inf.component !== "string" || inf.component.indexOf("input:")!==0) return;
-  if (inf.event === "btn_down" || inf.event === "btn_up") return;
+
+  if (inf.event === "btn_down" || inf.event === "btn_up") return; // ignore raw edges
 
   let id = (typeof inf.id === "number") ? inf.id : parseInt(String(inf.id), 10);
   let ev = String(inf.event || "");
   let tok = mapToken(id, ev);
-  if (tok) kvsSetMulti(tok);
+  if (!tok) return;
+
+  // Route by group: A = id 0/1, B = id 2/3
+  if (id === 0 || id === 1)      kvsSetToList(tok, A_IPS, "A");
+  else if (id === 2 || id === 3) kvsSetToList(tok, B_IPS, "B");
 });
 
+/* Optional fallback (classic 2-parameter hook, for older FW behavior) */
 Shelly.addEventHandler(function (ev, info) {
   if (ev !== "input_event" || !info) return;
   let id = (typeof info.id === "number") ? info.id : parseInt(String(info.id), 10);
   let tok = mapToken(id, String(info.event||""));
-  if (tok) kvsSetMulti(tok);
+  if (!tok) return;
+
+  if (id === 0 || id === 1)      kvsSetToList(tok, A_IPS, "A");
+  else if (id === 2 || id === 3) kvsSetToList(tok, B_IPS, "B");
 });

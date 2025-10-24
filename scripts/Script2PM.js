@@ -3,6 +3,8 @@
  * Author: Franz Forster
  * License: MIT
  *
+ * v1.2 — October 24, 2025   Added Two-Group Mode for i4 (no changes here)
+ * 
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the "Software"),
  * to deal in the Software without restriction, including without limitation
