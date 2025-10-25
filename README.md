@@ -1,6 +1,6 @@
 # Shelly Cover Controller (Gen3 Hardware)
 
-**Control a Shelly Plus 2PM (Gen3) roller shutter / blind with a Shelly i4 (Gen3)**  
+**Control a Shelly 2PM Gen3 roller shutter / blind with a Shelly i4 Gen3**  
 using Shelly Script (JS, Gen3). Supports *short*, *double* and *long* presses on the i4,
 custom presets, slat-nudging, and safe cover movement.
 
@@ -11,7 +11,7 @@ Deutsche Version unten
 
 ## 🧩 Overview
 
-This project connects a **Shelly i4 Gen3** (input controller) with one or more **Shelly Plus 2PM Gen3**
+This project connects a **Shelly i4 Gen3** (input controller) with one or more **Shelly 2PM Gen3**
 (actuator) using Shelly Script and local KVS (Key-Value Store) messaging.
 
 - **i4 Script:** Detects button events (short / double / long press) and sends commands to one or more target 2PMs.
@@ -30,7 +30,7 @@ This project connects a **Shelly i4 Gen3** (input controller) with one or more *
 | Device | Type / Gen | Script | Purpose |
 |---------|-------------|---------|----------|
 | Shelly i4 Gen3 | Input controller | `scripts/ScriptI4.js` | Sends commands |
-| Shelly Plus 2PM Gen3 | Actuator | `scripts/Script2PM.js` | Executes commands |
+| Shelly 2PM Gen3 | Actuator | `scripts/Script2PM.js` | Executes commands |
 
 ---
 
@@ -83,7 +83,7 @@ Requests are sent sequentially with a short delay between devices.
 
 All values can be set via `/rpc/KVS.Set` and viewed using `/rpc/KVS.GetAll`
 
-### 2️⃣ On Shelly Plus 2PM Gen3
+### 2️⃣ On Shelly 2PM Gen3
 
 #### 2PM Configuration
 
@@ -156,7 +156,7 @@ http://192.168.1.63/rpc/KVS.Set?key=nudge_down_ms&value=600
 | Device | Firmware |
 |---------|-----------|
 | Shelly i4 Gen3 | 1.7.1 |
-| Shelly Plus 2PM Gen3 | 1.7.1 |
+| Shelly 2PM Gen3 | 1.7.1 |
 
 ---
 
@@ -196,7 +196,7 @@ You are free to use and modify it under the terms of the MIT License.
 
 # Shelly Rolladen Controller (Gen3 Hardware)
 
-**Steuert einen Rollladen/eine Jalousie** Shelly Plus 2PM (Gen3) mit einem Shelly i4 (Gen3) mithilfe von Shelly Script (JS, Gen3).
+**Steuert einen Rollladen/eine Jalousie** Shelly 2PM Gen3 mit einem Shelly i4 Gen3 mithilfe von Shelly Script (JS, Gen3).
 Unterstützt *kurzes*, *doppeltes* und *langes* Drücken auf dem i4, benutzerdefinierte Voreinstellungen, Lamellenverschiebung und sichere Abdeckungsbewegung
 
 ---
@@ -204,7 +204,7 @@ Unterstützt *kurzes*, *doppeltes* und *langes* Drücken auf dem i4, benutzerdef
 
 ## 🧩 Übersicht
 
-Dieses Projekt verbindet einen **Shelly i4 Gen3** (Eingabecontroller) mit einem oder mehreren **Shelly Plus 2PM Gen3**
+Dieses Projekt verbindet einen **Shelly i4 Gen3** (Eingabecontroller) mit einem oder mehreren **Shelly 2PM Gen3**
 (Aktoren) mithilfe von Shelly Script und lokaler KVS-Nachrichtenübermittlung (Key-Value Store).
 
 - **i4 Script:** Erkennt Tastenereignisse (kurzes/doppeltes/langes Drücken) und sendet Befehle an einen oder mehrere Ziel-2PMs.
@@ -223,7 +223,7 @@ Dieses Projekt verbindet einen **Shelly i4 Gen3** (Eingabecontroller) mit einem 
 | Device | Type / Gen | Script | Funktion |
 |---------|-------------|---------|----------|
 | Shelly i4 Gen3 | Input controller | `scripts/ScriptI4.js` | Sendet Kommandos |
-| Shelly Plus 2PM Gen3 | Actuator | `scripts/Script2PM.js` | Führt Kommandos aus |
+| Shelly 2PM Gen3 | Actuator | `scripts/Script2PM.js` | Führt Kommandos aus |
 
 ---
 ---
@@ -277,7 +277,7 @@ Anfragen werden nacheinander mit einer kurzen Verzögerung zwischen den Geräten
 
 Alle Werte können über `/rpc/KVS.Set` festgelegt und mit `/rpc/KVS.GetAll` angezeigt werden.
 
-### 2️⃣ Auf Shelly Plus 2PM Gen3
+### 2️⃣ Auf Shelly 2PM Gen3
 
 #### 2PM-Konfiguration
 
@@ -350,7 +350,7 @@ http://192.168.1.63/rpc/KVS.Set?key=nudge_down_ms&value=600
 | Gerät | Firmware |
 |---------|-----------|
 | Shelly i4 Gen3 | 1.7.1 |
-| Shelly Plus 2PM Gen3 | 1.7.1 |
+| Shelly 2PM Gen3 | 1.7.1 |
 
 ---
 
