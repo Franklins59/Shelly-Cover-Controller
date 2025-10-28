@@ -169,6 +169,28 @@ http://192.168.1.63/rpc/KVS.Set?key=nudge_down_ms&value=600
 
 ---
 
+## 💡 About Lamella (Slat) Control and BTHome Limitations
+
+Shelly Gen3 devices (including the 2PM in Cover mode) currently do not expose a public RPC for lamella/slat angle control.
+The internal firmware supports this feature, but it is only accessible via the device UI or Actions triggered by BTHome devices (e.g. BLU Buttons).
+
+When using BTHome, the Shelly executes internal logic locally — this includes tilt/slat adjustments if configured in the Action profile.
+However, until now these mechanisms are not part of the documented RPC API and cannot be directly scripted.
+
+Multi-target control with BTHome is technically possible but works very differently:
+
+- You can pair one BLU Button with multiple Shelly devices, each reacting locally to the same BLE event.
+- There is no IP broadcast or RPC fan-out — each device must be configured individually.
+- The result depends on BLE range and signal timing, not on deterministic sequencing like in RPC scripts.
+
+**Summary:**
+
+➡️ BTHome + Actions: Local, simple, and good for single-room setups — but limited to BLE range and predefined actions.
+
+➡️ RPC script: IP-based, scalable, and suitable for multi-device synchronization, precise presets, and state-driven logic.
+
+---
+
 ## 💬 Contribute / Share
 
 Contributions and translations are welcome!  
@@ -190,9 +212,7 @@ You are free to use and modify it under the terms of the MIT License.
 
 ---
 
-
-*Deutsche Übersetzung*
-
+**Deutsche Übersetzung**
 
 # Shelly Rolladen Controller (Gen3 Hardware)
 
@@ -363,6 +383,26 @@ http://192.168.1.63/rpc/KVS.Set?key=nudge_down_ms&value=600
 
 ---
 
+## 💡 Über Lamellenverstellung und BTHome
+
+Shelly Gen3-Geräte (einschließlich 2PM im Cover-Modus) bieten derzeit keine dokumentierte RPC für die Steuerung des Lamellenwinkels.
+Die interne Firmware unterstützt diese Funktion, sie ist jedoch nur über die Geräte-Benutzeroberfläche oder über Aktionen zugänglich, die von BTHome-Geräten (z. B. BLU-Tasten) ausgelöst werden.
+
+Bei Verwendung von BTHome führt Shelly die interne Logik lokal aus – dies umfasst auch Neigungs-/Lamellenanpassungen, sofern diese im Aktionsprofil konfiguriert sind.
+Bislang sind diese Mechanismen jedoch nicht Teil der dokumentierten RPC-API und können nicht direkt benutzt werden.
+
+Die Multi-Target-Steuerung mit BTHome ist technisch möglich, funktioniert jedoch ganz anders:
+
+- Sie können einen BLU-Button mit mehreren Shelly-Geräten koppeln, die jeweils lokal auf dasselbe BLE-Ereignis reagieren.
+- Es gibt keine IP-Broadcast- oder RPC-Fan-Out-Funktion – jedes Gerät muss einzeln konfiguriert werden.
+- Das Ergebnis hängt von der BLE-Reichweite und dem Signal-Timing ab, nicht von einer deterministischen Abfolge wie in RPC-Skripten.
+
+**Zusammenfassung:**
+
+➡️ BTHome + Actions: Lokal, einfach und gut für Einzelraumkonfigurationen geeignet – jedoch auf BLE-Reichweite und vordefinierte Aktionen beschränkt.
+
+➡️ RPC script: IP-basiert, skalierbar und geeignet für die Synchronisierung mehrerer Geräte, präzise Voreinstellungen und zustandsgesteuerte Logik.
+
 ## 💬 Beitragen / Teilen
 
 Beiträge und Übersetzungen sind willkommen!  
@@ -381,5 +421,3 @@ Dieses Projekt wird unter der **MIT-Lizenz** veröffentlicht.
 
 ⚠️ Die Verwendung erfolgt auf eigene Gefahr - es wird keine Garantie oder Haftung übernommen.
 Es steht Ihnen frei, es unter den Bedingungen der MIT-Lizenz zu verwenden und zu verändern.  
-
-
